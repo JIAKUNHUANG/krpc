@@ -18,24 +18,24 @@ type Response struct {
 	Error  string
 }
 
-type Server struct {
-	Service  map[string]interface{}
+type Service struct {
+	MethodList  map[string]interface{}
 	Listener *net.TCPListener
 }
 
-func CreateServer() *Server {
-	server := &Server{
-		Service: make(map[string]interface{}),
+func CreateService() *Service {
+	server := &Service{
+		MethodList: make(map[string]interface{}),
 	}
 	return server
 }
 
-func (s *Server) AddServer(name string, function interface{}) {
-	s.Service[name] = function
+func (s *Service) AddMethod(name string, Method interface{}) {
+	s.MethodList[name] = Method
 
 }
 
-func (s *Server) RegisterServer(addr *net.TCPAddr) (err error) {
+func (s *Service) RegisterService(addr *net.TCPAddr) (err error) {
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (s *Server) RegisterServer(addr *net.TCPAddr) (err error) {
 	return nil
 }
 
-func (s *Server) Server() {
+func (s *Service) Service() {
 	for {
 		conn, err := s.Listener.AcceptTCP()
 		if err != nil {
@@ -56,9 +56,10 @@ func (s *Server) Server() {
 	}
 }
 
-func (s *Server) HandleServerConnection(conn *net.TCPConn) {
+func (s *Service) HandleServerConnection(conn *net.TCPConn) {
 	defer conn.Close()
 	for {
+		// 收包
 		header := make([]byte, 4)
 		_, err := receiveBag(conn, header)
 		if err != nil {
@@ -70,10 +71,14 @@ func (s *Server) HandleServerConnection(conn *net.TCPConn) {
 		if err != nil {
 			break
 		}
+
+		// 处理包
 		backBuf, err := s.HandlerBuf(buf[:n])
 		if err != nil {
 			break
 		}
+
+		// 发包
 		backBufLen := uint32(len(backBuf))
 		backBufHeader := make([]byte, 4)
 		binary.BigEndian.PutUint32(backBufHeader, backBufLen)
@@ -82,13 +87,15 @@ func (s *Server) HandleServerConnection(conn *net.TCPConn) {
 	}
 }
 
-func (s *Server) HandlerBuf(buf []byte) (backBuf []byte, err error) {
+func (s *Service) HandlerBuf(buf []byte) (backBuf []byte, err error) {
 	var req Request
 	if err := json.Unmarshal(buf, &req); err != nil {
 		return nil, err
 	}
+
+	// 调用方法处理请求
 	fmt.Println(req.Method)
-	if serviceFunc := s.Service[req.Method]; serviceFunc != nil {
+	if serviceFunc := s.MethodList[req.Method]; serviceFunc != nil {
 		fmt.Println(serviceFunc)
 		return s.CallServiceMethod(serviceFunc, req.Params)
 
@@ -98,23 +105,40 @@ func (s *Server) HandlerBuf(buf []byte) (backBuf []byte, err error) {
 
 }
 
-func (s *Server) CallServiceMethod(serviceFunc interface{}, params []interface{}) ([]byte, error) {
+func (s *Service) CallServiceMethod(serviceFunc interface{}, params interface{}) ([]byte, error) {
 	funcValue := reflect.ValueOf(serviceFunc)
-	fmt.Println(funcValue)
-	// 指针解引用
-	if funcValue.Kind() == reflect.Ptr {
-		funcValue = funcValue.Elem()
-	}
-	fmt.Println(funcValue)
 
-	funcParams := make([]reflect.Value, len(params))
-
-	for i, param := range params {
-		funcParams[i] = reflect.ValueOf(param)
+	// 确保 serviceFunc 是一个函数
+	if funcValue.Kind() != reflect.Func {
+		return nil, fmt.Errorf("serviceFunc must be a function")
 	}
 
+	// 获取函数的参数类型
+	funcType := funcValue.Type()
+	if funcType.NumIn() != 1 {
+		return nil, fmt.Errorf("serviceFunc must have exactly one input parameter")
+	}
+
+	paramType := funcType.In(0)
+
+	// 创建指定类型的实例
+	paramValue := reflect.New(paramType).Interface()
+
+	// 将 params 转换为 JSON 并解析到 paramValue
+	paramsBytes, err := json.Marshal(params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal params: %v", err)
+	}
+
+	if err := json.Unmarshal(paramsBytes, paramValue); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal params: %v", err)
+	}
+
+	// 调用方法
+	funcParams := []reflect.Value{reflect.ValueOf(paramValue).Elem()}
 	results := funcValue.Call(funcParams)
 
+	// 返回值处理
 	resultsInterfaces := make([]interface{}, len(results))
 	for i, result := range results {
 		resultsInterfaces[i] = result.Interface()

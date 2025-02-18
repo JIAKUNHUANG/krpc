@@ -9,11 +9,11 @@ import (
 
 type Request struct {
 	Method string
-	Params []interface{}
+	Params interface{}
 }
 
 type Response struct {
-	Result []interface{}
+	Result interface{}
 	Error  string
 }
 
@@ -21,11 +21,11 @@ type Client struct {
 	Conn *net.TCPConn
 }
 
-func CreateClient() *Client {
+func NewClient() *Client {
 	return &Client{}
 }
 
-func (c *Client) RegisterClient(addr *net.TCPAddr) error {
+func (c *Client) RegisterClient(targetAddr string) error {
 	localAddr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		return err
@@ -35,6 +35,11 @@ func (c *Client) RegisterClient(addr *net.TCPAddr) error {
 		return err
 	}
 	defer listener.Close()
+
+	addr, err := net.ResolveTCPAddr("tcp", targetAddr)
+	if err != nil {
+		return err
+	}
 	conn, err := net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		return err
@@ -45,13 +50,13 @@ func (c *Client) RegisterClient(addr *net.TCPAddr) error {
 
 func (c *Client) Call(req Request) (rsp Response, err error) {
 	reqBuf, _ := json.Marshal(req)
-
+	fmt.Println(req.Params)
 	reqBufLen := len(reqBuf)
 	reqBufHeader := make([]byte, 4)
 	binary.BigEndian.PutUint32(reqBufHeader, uint32(reqBufLen))
 
 	reqBuf = append(reqBufHeader, reqBuf...)
-	fmt.Println(string(reqBuf))
+
 	c.Conn.Write(reqBuf)
 
 	rspBufHeader := make([]byte, 4)

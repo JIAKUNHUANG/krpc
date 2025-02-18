@@ -1,0 +1,56 @@
+{
+  "messages": {
+    "Teacher": {
+      "message": {
+        "name": {
+          "type": "string"
+        },
+        "sex": {
+          "type": "bool"
+        },
+        "studentData": {
+          "type": "Student"
+        }
+      }
+    },
+    "Student": {
+      "message": {
+        "name": {
+          "type": "string"
+        },
+        "sex": {
+          "type": "bool"
+        }
+      }
+    },
+    "DoubleRequest": {
+      "message": {
+        "num": {
+          "type": "float64"
+        }
+      }
+    },
+    "DoubleResponse": {
+      "message": {
+        "num": {
+          "type": "float64"
+        }
+      }
+    }
+  },
+  "service": {
+    "name": "ServiceTest",
+    "methods": [
+      {
+        "name": "Double",
+        "input": "NumRequest",
+        "output": "NumResponse"
+      },
+      {
+        "name": "SayHello",
+        "input": "HelloRequest",
+        "output": "HelloResponse"
+      }
+    ]
+  }
+}

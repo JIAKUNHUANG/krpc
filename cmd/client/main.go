@@ -1,79 +1,43 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net"
 
-	"github.com/JIAKUNHUANG/krpc/client"
+	"github.com/JIAKUNHUANG/krpc/test/stub"
 )
 
+type Teacher struct {
+	Name        string  `json:"name"`
+	Sex         bool    `json:"sex"`
+	StudentData Student `json:"studentData"`
+}
+
+type Student struct {
+	Name string `json:"name"`
+	Sex  bool   `json:"sex"`
+}
+
 func main() {
-
-	rsp, err := Double(2)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	fmt.Println(rsp)
-
-
-	rsp, err = Add(2)
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	fmt.Println(rsp)
-
+	CallDouble()
 }
 
-func Double(input float64) (output float64, err error) {
+func CallDouble() {
+	// 注册客户端
+	p := stub.NewProxy()
 
-	c := client.CreateClient()
-	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:8000")
+	err := p.RegisterProxy("127.0.0.1:8000")
 	if err != nil {
-
-		return 0, err
+		log.Fatal(err)
 	}
-	err = c.RegisterClient(addr)
+
+	req := &stub.DoubleRequest{
+		Num: 1.0,
+	}
+	log.Println("request:", req.Num)
+
+	rsp, err := p.Double(req)
 	if err != nil {
-		return 0, err
+		log.Fatal(err)
 	}
-
-	req := client.Request{
-		Method: "Double",
-		Params: []interface{}{input},
-	}
-
-	rsp, err := c.Call(req)
-	if err != nil {
-		return 0, err
-	}
-	return rsp.Result[0].(float64), nil
-}
-
-
-func Add(input float64) (output float64, err error) {
-
-	c := client.CreateClient()
-	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:8000")
-	if err != nil {
-
-		return 0, err
-	}
-	err = c.RegisterClient(addr)
-	if err != nil {
-		return 0, err
-	}
-
-	req := client.Request{
-		Method: "Add",
-		Params: []interface{}{input},
-	}
-
-	rsp, err := c.Call(req)
-	if err != nil {
-		return 0, err
-	}
-	return rsp.Result[0].(float64), nil
+	log.Println("response:", rsp.Num)
 }
