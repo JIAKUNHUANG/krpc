@@ -47,9 +47,9 @@
         "output": "NumResponse"
       },
       {
-        "name": "SayHello",
-        "input": "HelloRequest",
-        "output": "HelloResponse"
+        "name": "SexExchange",
+        "input": "Teacher",
+        "output": "Teacher"
       }
     ]
   }

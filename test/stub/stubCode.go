@@ -1,19 +1,42 @@
 package stub
 
 import (
+	"encoding/json"
+
 	"github.com/JIAKUNHUANG/krpc/client"
+	"github.com/JIAKUNHUANG/krpc/server"
 )
 
-type DoubleRequest struct {
+type Teacher struct {
+	Name        string  `json:"name"`
+	Sex         bool    `json:"sex"`
+	StudentData Student `json:"studentData"`
+}
+
+type Student struct {
+	Name string `json:"name"`
+	Sex  bool   `json:"sex"`
+}
+
+type NumRequest struct {
 	Num float64 `json:"num"`
 }
 
-type DoubleResponse struct {
+type NumResponse struct {
 	Num float64 `json:"num"`
 }
 
 type Proxy struct {
 	client *client.Client
+}
+
+func RegisterTestService(s *server.Service) {
+	s.AddMethod("SexExchange", SexExchangeFunc)
+	s.AddMethod("Double", DoubleFunc)
+	err := s.RegisterService("127.0.0.1:8000")
+	if err != nil {
+		panic(err)
+	}
 }
 
 func NewProxy() *Proxy {
@@ -22,15 +45,36 @@ func NewProxy() *Proxy {
 	return p
 }
 
-func (p *Proxy) RegisterProxy(addr string) error {
-	err := p.client.RegisterClient(addr)
+func (p *Proxy) RegisterProxy() error {
+	err := p.client.ConnectService("127.0.0.1:8000")
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (p *Proxy) Double(clientReq *DoubleRequest) (*DoubleResponse, error) {
+func (p *Proxy) SexExchange(clientReq Teacher) (clientRsp Teacher, err error) {
+	req := client.Request{
+		Method: "SexExchange",
+		Params: clientReq,
+	}
+
+	rsp, err := p.client.Call(req)
+	if err != nil {
+		return clientRsp, err
+	}
+
+	rspResultBuf, _ := json.Marshal(rsp.Result)
+	err = json.Unmarshal(rspResultBuf, &clientRsp)
+	if err != nil {
+		return clientRsp, err
+	}
+
+	return clientRsp, nil
+
+}
+
+func (p *Proxy) Double(clientReq NumRequest) (clientRsp NumResponse, err error) {
 	req := client.Request{
 		Method: "Double",
 		Params: clientReq,
@@ -38,10 +82,15 @@ func (p *Proxy) Double(clientReq *DoubleRequest) (*DoubleResponse, error) {
 
 	rsp, err := p.client.Call(req)
 	if err != nil {
-		return nil, err
+		return clientRsp, err
 	}
 
-	clientRsp := (rsp.Result).(*DoubleResponse)
+	rspResultBuf, _ := json.Marshal(rsp.Result)
+	err = json.Unmarshal(rspResultBuf, &clientRsp)
+	if err != nil {
+		return clientRsp, err
+	}
+
 	return clientRsp, nil
 
 }
