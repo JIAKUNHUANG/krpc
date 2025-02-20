@@ -6,17 +6,6 @@ import (
 	"github.com/JIAKUNHUANG/krpc/test/stub"
 )
 
-type Teacher struct {
-	Name        string  `json:"name"`
-	Sex         bool    `json:"sex"`
-	StudentData Student `json:"studentData"`
-}
-
-type Student struct {
-	Name string `json:"name"`
-	Sex  bool   `json:"sex"`
-}
-
 func main() {
 	CallDouble()
 }
@@ -25,19 +14,33 @@ func CallDouble() {
 	// 注册客户端
 	p := stub.NewProxy()
 
-	err := p.RegisterProxy("127.0.0.1:8000")
+	err := p.RegisterProxy()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	req := &stub.DoubleRequest{
+	req1 := stub.Teacher{
+		Name: "JIAKUNHUANG",
+		Sex:  true,
+		StudentData: stub.Student{
+			Name: "JIAKUNHUANG",
+			Sex:  true,
+		},
+	}
+	log.Println("request1:", req1)
+	rsp1, err := p.SexExchange(req1)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("response1:", rsp1)
+
+	req2 := stub.NumRequest{
 		Num: 1.0,
 	}
-	log.Println("request:", req.Num)
-
-	rsp, err := p.Double(req)
+	log.Println("request2:", req2)
+	rsp2, err := p.Double(req2)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("response:", rsp.Num)
+	log.Println("response2:", rsp2)
 }

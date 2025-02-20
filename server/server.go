@@ -4,23 +4,24 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"reflect"
 )
 
 type Request struct {
 	Method string
-	Params []interface{}
+	Params interface{}
 }
 
 type Response struct {
-	Result []interface{}
+	Result interface{}
 	Error  string
 }
 
 type Service struct {
-	MethodList  map[string]interface{}
-	Listener *net.TCPListener
+	MethodList map[string]interface{}
+	Listener   *net.TCPListener
 }
 
 func CreateService() *Service {
@@ -35,7 +36,12 @@ func (s *Service) AddMethod(name string, Method interface{}) {
 
 }
 
-func (s *Service) RegisterService(addr *net.TCPAddr) (err error) {
+func (s *Service) RegisterService(serviceAddr string) (err error) {
+	addr, err := net.ResolveTCPAddr("tcp", serviceAddr)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 	listener, err := net.ListenTCP("tcp", addr)
 	if err != nil {
 		return err
@@ -72,13 +78,17 @@ func (s *Service) HandleServerConnection(conn *net.TCPConn) {
 			break
 		}
 
+		log.Println("recieve:", string(buf))
+
 		// 处理包
 		backBuf, err := s.HandlerBuf(buf[:n])
 		if err != nil {
+			log.Println(err)
 			break
 		}
 
 		// 发包
+		log.Println("send:", string(backBuf))
 		backBufLen := uint32(len(backBuf))
 		backBufHeader := make([]byte, 4)
 		binary.BigEndian.PutUint32(backBufHeader, backBufLen)
@@ -94,9 +104,7 @@ func (s *Service) HandlerBuf(buf []byte) (backBuf []byte, err error) {
 	}
 
 	// 调用方法处理请求
-	fmt.Println(req.Method)
 	if serviceFunc := s.MethodList[req.Method]; serviceFunc != nil {
-		fmt.Println(serviceFunc)
 		return s.CallServiceMethod(serviceFunc, req.Params)
 
 	} else {
@@ -139,10 +147,7 @@ func (s *Service) CallServiceMethod(serviceFunc interface{}, params interface{})
 	results := funcValue.Call(funcParams)
 
 	// 返回值处理
-	resultsInterfaces := make([]interface{}, len(results))
-	for i, result := range results {
-		resultsInterfaces[i] = result.Interface()
-	}
+	resultsInterfaces := results[0].Interface()
 
 	return json.Marshal(Response{Result: resultsInterfaces, Error: ""})
 
