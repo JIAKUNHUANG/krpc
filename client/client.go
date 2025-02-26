@@ -49,11 +49,15 @@ func ConnectServiceFinding(serviceFindingAddr string, serviceName string) (servi
 		return "", err
 	}
 
-	req := FindingRequest{
-		ReqType: "finding",
-		ServiceName: serviceName,
+	req := Request{
+		Method: "ServiceFindingMethod",
+		Params: FindingRequest{
+			ReqType: "finding", 
+			ServiceName: serviceName,
+		},
 	}
-	var rsp FindingResponse
+	var rsp Response
+	var findingResponse FindingResponse
 
 	reqBuf, _ := json.Marshal(req)
 	reqBufLen := len(reqBuf)
@@ -73,10 +77,14 @@ func ConnectServiceFinding(serviceFindingAddr string, serviceName string) (servi
 	conn.Read(rspBuf)
 	json.Unmarshal(rspBuf, &rsp)
 
-	if rsp.Status != "ok" {
-		return "", fmt.Errorf(rsp.ErrMsg)
+	findingResponseByte,_:=json.Marshal(rsp.Result)
+	json.Unmarshal(findingResponseByte,&findingResponse)
+
+
+	if findingResponse.Status != "ok" {
+		return "",fmt.Errorf(findingResponse.ErrMsg)
 	}
-	return rsp.Addr, nil
+	return findingResponse.Addr, nil
 }
 
 func (c *Client) ConnectService(targetAddr string) error {

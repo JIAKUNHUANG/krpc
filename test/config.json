@@ -1,11 +1,11 @@
 {
     "serviceAddr":{
         "ip": "127.0.0.1",
-        "port": 8000
+        "port": 0
     },
     "serviceFindingAddr":{
         "ip": "127.0.0.1",
         "port": 8000,
-        "execute": false
+        "execute": true
     }
 }

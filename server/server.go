@@ -117,12 +117,16 @@ func (s *Service) ServiceFinding() error {
 		return err
 	}
 
-	req := FindingRequest{
-		ReqType:     "connect",
-		Addr:        localAddr,
-		ServiceName: s.ServiceName,
+	req := Request{
+		Method: "ServiceFindingMethod",
+		Params: FindingRequest{
+			ReqType:     "connect",
+			Addr:        localAddr,
+			ServiceName: s.ServiceName,
+		},
 	}
-	var rsp FindingResponse
+	var rsp Response
+	var findingResponse FindingResponse
 
 	reqBuf, _ := json.Marshal(req)
 	reqBufLen := len(reqBuf)
@@ -143,8 +147,12 @@ func (s *Service) ServiceFinding() error {
 	s.ServiceFindingConn.Read(rspBuf)
 	json.Unmarshal(rspBuf, &rsp)
 
-	if rsp.Status != "ok" {
-		return fmt.Errorf(rsp.ErrMsg)
+	findingResponseByte,_:=json.Marshal(rsp.Result)
+	json.Unmarshal(findingResponseByte,&findingResponse)
+
+
+	if findingResponse.Status != "ok" {
+		return fmt.Errorf(findingResponse.ErrMsg)
 	}
 
 	return nil
