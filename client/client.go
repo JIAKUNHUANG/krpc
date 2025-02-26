@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"net"
 )
 
@@ -24,16 +25,48 @@ func NewClient() *Client {
 	return &Client{}
 }
 
+func ConnectServiceFinding(serviceFindingAddr string, serviceName string) (serviceAddr string, err error) {
+	addr, err := net.ResolveTCPAddr("tcp", serviceFindingAddr)
+	if err != nil {
+		return "", err
+	}
+
+	conn, err := net.DialTCP("tcp", nil, addr)
+	if err != nil {
+		return "", err
+	}
+
+	req := Request{
+		Method: "searchService",
+		Params: serviceName,
+	}
+	var rsp Response
+
+	reqBuf, _ := json.Marshal(req)
+	reqBufLen := len(reqBuf)
+	reqBufHeader := make([]byte, 4)
+	binary.BigEndian.PutUint32(reqBufHeader, uint32(reqBufLen))
+
+	reqBuf = append(reqBufHeader, reqBuf...)
+	conn.Write(reqBuf)
+
+	rspBufHeader := make([]byte, 4)
+	conn.Read(rspBufHeader)
+	rspBufLen := binary.BigEndian.Uint32(rspBufHeader)
+	rspBuf := make([]byte, rspBufLen)
+	conn.Read(rspBuf)
+	json.Unmarshal(rspBuf, &rsp)
+
+	if rsp.Result == nil {
+		rsp.Error = "no service found"
+	}
+	if rsp.Error != "" {
+		return "", fmt.Errorf(rsp.Error)
+	}
+	return rsp.Result.(string), nil
+}
+
 func (c *Client) ConnectService(targetAddr string) error {
-	localAddr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		return err
-	}
-	listener, err := net.ListenTCP("tcp", localAddr)
-	if err != nil {
-		return err
-	}
-	defer listener.Close()
 
 	addr, err := net.ResolveTCPAddr("tcp", targetAddr)
 	if err != nil {

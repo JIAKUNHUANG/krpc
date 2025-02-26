@@ -31,9 +31,12 @@ type Proxy struct {
 }
 
 func RegisterTestService(s *server.Service) {
+	s.ServiceName = "ServiceTest"
 	s.AddMethod("SexExchange", SexExchangeFunc)
 	s.AddMethod("Double", DoubleFunc)
-	err := s.RegisterService("127.0.0.1:8000")
+	addr := server.GetAddr(s.Config.ServiceAddr.Ip, s.Config.ServiceAddr.Port)
+
+	err := s.RegisterService(addr)
 	if err != nil {
 		panic(err)
 	}
@@ -46,7 +49,12 @@ func NewProxy() *Proxy {
 }
 
 func (p *Proxy) RegisterProxy() error {
-	err := p.client.ConnectService("127.0.0.1:8000")
+	serviceAddr, err := client.ConnectServiceFinding("127.0.0.1:8000", "ServiceTest")
+	if err != nil {
+		return err
+	}
+
+	err = p.client.ConnectService(serviceAddr)
 	if err != nil {
 		return err
 	}

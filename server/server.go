@@ -4,9 +4,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
+	"os"
 	"reflect"
+	"strconv"
+	"strings"
 )
 
 type Request struct {
@@ -20,8 +24,22 @@ type Response struct {
 }
 
 type Service struct {
-	MethodList map[string]interface{}
-	Listener   *net.TCPListener
+	MethodList         map[string]interface{}
+	Listener           *net.TCPListener
+	Config             Config
+	ServiceName        string
+	ServiceFindingConn *net.TCPConn
+}
+
+type Config struct {
+	ServiceAddr        NetField `json:"serviceAddr"`
+	ServiceFindingAdrr NetField `json:"serviceFindingAddr"`
+}
+
+type NetField struct {
+	Ip      string `json:"ip"`
+	Port    int    `json:"port"`
+	Execute bool   `json:"execute"`
 }
 
 func CreateService() *Service {
@@ -29,6 +47,22 @@ func CreateService() *Service {
 		MethodList: make(map[string]interface{}),
 	}
 	return server
+}
+
+func (s *Service) GetConfig(filename string) (err error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	byteValue, err := ioutil.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	json.Unmarshal(byteValue, &s.Config)
+	return nil
 }
 
 func (s *Service) AddMethod(name string, Method interface{}) {
@@ -46,9 +80,58 @@ func (s *Service) RegisterService(serviceAddr string) (err error) {
 	if err != nil {
 		return err
 	}
+
+	ip, port := SplitAddr(listener.Addr().String())
+	s.Config.ServiceAddr.Ip = ip
+	s.Config.ServiceAddr.Port = port
+
 	s.Listener = listener
 
 	return nil
+}
+
+func (s *Service) ServiceFinding() error {
+	serviceFindingAddr := GetAddr(s.Config.ServiceFindingAdrr.Ip, s.Config.ServiceFindingAdrr.Port)
+	addr, err := net.ResolveTCPAddr("tcp", serviceFindingAddr)
+	if err != nil {
+		return err
+	}
+
+	s.ServiceFindingConn, err = net.DialTCP("tcp", nil, addr)
+	if err != nil {
+		return err
+	}
+
+	req := Request{
+		Method: s.ServiceName,
+		Params: s.Config.ServiceAddr.Ip,
+	}
+	var rsp Response
+
+	reqBuf, _ := json.Marshal(req)
+	reqBufLen := len(reqBuf)
+	reqBufHeader := make([]byte, 4)
+	binary.BigEndian.PutUint32(reqBufHeader, uint32(reqBufLen))
+
+	reqBuf = append(reqBufHeader, reqBuf...)
+	s.ServiceFindingConn.Write(reqBuf)
+
+	rspBufHeader := make([]byte, 4)
+	s.ServiceFindingConn.Read(rspBufHeader)
+	rspBufLen := binary.BigEndian.Uint32(rspBufHeader)
+	rspBuf := make([]byte, rspBufLen)
+	s.ServiceFindingConn.Read(rspBuf)
+	json.Unmarshal(rspBuf, &rsp)
+
+	if rsp.Result == nil {
+		rsp.Error = "service register failed"
+	}
+	if rsp.Error != "" {
+		return fmt.Errorf(rsp.Error)
+	}
+
+	return nil
+
 }
 
 func (s *Service) Service() {
@@ -163,4 +246,16 @@ func receiveBag(conn net.Conn, buf []byte) (int, error) {
 		total += n
 	}
 	return total, nil
+}
+
+func GetAddr(ip string, port int) (addr string) {
+	addr = ip + ":" + strconv.Itoa(port)
+	return addr
+}
+
+func SplitAddr(addr string) (ip string, port int) {
+	addrArr := strings.Split(addr, ":")
+	ip = addrArr[0]
+	port, _ = strconv.Atoi(addrArr[1])
+	return ip, port
 }
