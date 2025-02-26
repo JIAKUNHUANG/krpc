@@ -42,6 +42,19 @@ type NetField struct {
 	Execute bool   `json:"execute"`
 }
 
+type FindingRequest struct {
+	ReqType     string `json:"reqType"`
+	Addr        string `json:"addr"`
+	ServiceName string `json:"serviceName"`
+}
+
+type FindingResponse struct {
+	ServiceName string `json:"serviceName"`
+	ErrMsg      string `json:"errMsg"`
+	Status      string `json:"status"`
+	Addr        string `json:"addr"`
+}
+
 func CreateService() *Service {
 	server := &Service{
 		MethodList: make(map[string]interface{}),
@@ -92,6 +105,8 @@ func (s *Service) RegisterService(serviceAddr string) (err error) {
 
 func (s *Service) ServiceFinding() error {
 	serviceFindingAddr := GetAddr(s.Config.ServiceFindingAdrr.Ip, s.Config.ServiceFindingAdrr.Port)
+	localAddr := GetAddr(s.Config.ServiceAddr.Ip, s.Config.ServiceAddr.Port)
+
 	addr, err := net.ResolveTCPAddr("tcp", serviceFindingAddr)
 	if err != nil {
 		return err
@@ -102,11 +117,12 @@ func (s *Service) ServiceFinding() error {
 		return err
 	}
 
-	req := Request{
-		Method: s.ServiceName,
-		Params: s.Config.ServiceAddr.Ip,
+	req := FindingRequest{
+		ReqType:     "connect",
+		Addr:        localAddr,
+		ServiceName: s.ServiceName,
 	}
-	var rsp Response
+	var rsp FindingResponse
 
 	reqBuf, _ := json.Marshal(req)
 	reqBufLen := len(reqBuf)
@@ -117,17 +133,18 @@ func (s *Service) ServiceFinding() error {
 	s.ServiceFindingConn.Write(reqBuf)
 
 	rspBufHeader := make([]byte, 4)
-	s.ServiceFindingConn.Read(rspBufHeader)
+	_, err = s.ServiceFindingConn.Read(rspBufHeader)
+	if err != nil {
+		return err
+	}
 	rspBufLen := binary.BigEndian.Uint32(rspBufHeader)
+
 	rspBuf := make([]byte, rspBufLen)
 	s.ServiceFindingConn.Read(rspBuf)
 	json.Unmarshal(rspBuf, &rsp)
 
-	if rsp.Result == nil {
-		rsp.Error = "service register failed"
-	}
-	if rsp.Error != "" {
-		return fmt.Errorf(rsp.Error)
+	if rsp.Status != "ok" {
+		return fmt.Errorf(rsp.ErrMsg)
 	}
 
 	return nil

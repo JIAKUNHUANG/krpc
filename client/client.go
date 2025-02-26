@@ -21,6 +21,19 @@ type Client struct {
 	Conn *net.TCPConn
 }
 
+type FindingRequest struct {
+	ReqType     string `json:"reqType"`
+	Addr        string `json:"addr"`
+	ServiceName string `json:"serviceName"`
+}
+
+type FindingResponse struct {
+	ServiceName string `json:"serviceName"`
+	ErrMsg      string `json:"errMsg"`
+	Status      string `json:"status"`
+	Addr        string `json:"addr"`
+}
+
 func NewClient() *Client {
 	return &Client{}
 }
@@ -36,11 +49,11 @@ func ConnectServiceFinding(serviceFindingAddr string, serviceName string) (servi
 		return "", err
 	}
 
-	req := Request{
-		Method: "searchService",
-		Params: serviceName,
+	req := FindingRequest{
+		ReqType: "finding",
+		ServiceName: serviceName,
 	}
-	var rsp Response
+	var rsp FindingResponse
 
 	reqBuf, _ := json.Marshal(req)
 	reqBufLen := len(reqBuf)
@@ -51,19 +64,19 @@ func ConnectServiceFinding(serviceFindingAddr string, serviceName string) (servi
 	conn.Write(reqBuf)
 
 	rspBufHeader := make([]byte, 4)
-	conn.Read(rspBufHeader)
+	_,err=conn.Read(rspBufHeader)
+	if err != nil {
+		return "", err
+	}
 	rspBufLen := binary.BigEndian.Uint32(rspBufHeader)
 	rspBuf := make([]byte, rspBufLen)
 	conn.Read(rspBuf)
 	json.Unmarshal(rspBuf, &rsp)
 
-	if rsp.Result == nil {
-		rsp.Error = "no service found"
+	if rsp.Status != "ok" {
+		return "", fmt.Errorf(rsp.ErrMsg)
 	}
-	if rsp.Error != "" {
-		return "", fmt.Errorf(rsp.Error)
-	}
-	return rsp.Result.(string), nil
+	return rsp.Addr, nil
 }
 
 func (c *Client) ConnectService(targetAddr string) error {
